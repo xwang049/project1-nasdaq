@@ -1,0 +1,15 @@
+# requirements.txt
+
+nasdaq-data-link
+numpy
+pandas
+scikit-learn
+matplotlib
+seaborn
+scipy
+tensorflow
+jupyter
+ipykernel
+sqlalchemy
+mysql-connector-python
+python-dotenv
