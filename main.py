@@ -6,7 +6,7 @@ logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
 
 import nasdaqdatalink as nd
-nd.ApiConfig.api_key = "vMy2zfhwoANpKo1Y9PYV"
+
 
 # metadata = nd.get('NSE/OIL')
 # print(metadata)
