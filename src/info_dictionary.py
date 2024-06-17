@@ -1,11 +1,13 @@
 import csv
 import nasdaqdatalink as nd
-import sl_dict
+from src import sl_dict
+from src.config import NASDAQ_API
 
-nd.read_key(filename="mykey")
+nd.ApiConfig.api_key = NASDAQ_API
 
 def csv_to_nested_dict(file_path):
     nested_dict = {}
+    nd.ApiConfig.api_key = NASDAQ_API
     with open(file_path, mode='r') as file:
         csv_reader = csv.reader(file)
         for row_number, row in enumerate(csv_reader, start=0):
@@ -54,5 +56,5 @@ if __name__ == '__main__':
     print('OK')
     file_path = 'table_code.csv'
     info_dic = csv_to_nested_dict(file_path)
-    sl_dict.save(info_dic, 'info_dict.pkl')
+    sl_dict.save(info_dic, '../data/info_dict.pkl')
 

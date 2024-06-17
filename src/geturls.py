@@ -1,6 +1,5 @@
 import undetected_chromedriver as uc
 from bs4 import BeautifulSoup
-import concurrent.futures
 import time
 import csv
 
