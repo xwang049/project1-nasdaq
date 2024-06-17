@@ -5,17 +5,31 @@ import logging
 from .download_data import download_data
 engine = create_engine(DATABASE_URL)
 
-def save_to_db(dataframe, table_name, engine):
-    try:
-        dataframe.to_sql(table_name, engine, if_exists='replace', index=False)
-        logging.info(f"Table {table_name} created or replaced and data saved successfully.")
-    except SQLAlchemyError as e:
-        logging.error(f"Error saving {table_name}: {str(e)}")
+def compress_file(file_path):
+    with open(file_path, 'rb') as f_in:
+        with gzip.open(file_path + '.gz', 'wb') as f_out:
+            shutil.copyfileobj(f_in, f_out)
+    os.remove(file_path)
 
-def download_and_store_data(table, filters, engine):
-    table_name, data = download_data(table, **filters)
-    if data is not None:
+def save_to_db(dataframe, table_name):
+    try:
         table_name = table_name.replace('/', '_').lower()
-        save_to_db(data, table_name, engine)
-    else:
-        logging.error(f"Failed to download data for table: {table}")
+        dataframe.to_sql(table_name, engine, if_exists='replace', index=False)
+        logging.info(f"Data saved to {table_name} table successfully.")
+    except SQLAlchemyError as e:
+        logging.error(f"Error saving data to database: {str(e)}")
+        
+def retrieve_data(query):
+    engine = create_engine(DATABASE_URL)
+    with engine.connect() as connection:
+        result = pd.read_sql(query, connection)
+    return result
+
+def process_data(key):
+    try:
+        df = nd.get_table(key).head()
+        date_guess = [col for col in df.columns if 'date' in col.lower()][0]
+        table, data = download_data(key, paginate = True,  **{date_guess: {'gte': '2024-03-15'}})
+    except:
+        table, data = download_data(key, paginate = True)
+    save_to_db(data, key)
