@@ -1,7 +1,5 @@
 import nasdaqdatalink as nd
-
 from src.config import NASDAQ_API
-
 
 def download_data(table, **filters):
     nd.ApiConfig.api_key = NASDAQ_API
