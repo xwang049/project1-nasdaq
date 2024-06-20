@@ -1,5 +1,6 @@
 import nasdaqdatalink as nd
 from src.config import NASDAQ_API
+from prefect import task, flow
 
 def download_data(table, **filters):
     nd.ApiConfig.api_key = NASDAQ_API
