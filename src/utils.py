@@ -6,6 +6,8 @@ from src.config import NASDAQ_API
 from src.sl_dict import load, save
 from src.store_data import process_data
 import concurrent
+from prefect import task, flow
+from prefect_multiprocess.task_runners import MultiprocessTaskRunner
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
 
