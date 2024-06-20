@@ -8,6 +8,7 @@ from sqlalchemy.exc import SQLAlchemyError
 from .config import DATABASE_URL
 import logging
 from .download_data import download_data
+from prefect import task, flow
 engine = create_engine(DATABASE_URL)
 
 def compress_file(file_path):
