@@ -3,47 +3,73 @@ from bs4 import BeautifulSoup
 import time
 import csv
 import pandas as pd
+from prefect import flow, task
+from prefect.task_runners import SequentialTaskRunner
 
-def table_to_df(tables):
-    header = [th.text for th in tables[0].find('thead').find_all('th')]
-    # Extract the table rows
-    rows = []
-    for tr in tables[0].find('tbody').find_all('tr'):
-        cells = []
-        for td in tr.find_all('td'):
-            # If the cell contains a link, extract the text
-            a = td.find('a')
-            if a:
-                cell_content = a.text
-            else:
-                cell_content = td.text
-            cells.append(cell_content)
-        rows.append(cells)
-
-    # Create the DataFrame
-    df = pd.DataFrame(rows, columns=header)
-
-    # Display the DataFrame
+def table_to_df(table):
+    try:
+        header = [th.text for th in table.find('thead').find_all('th')]
+        rows = []
+        for tr in table.find('tbody').find_all('tr'):
+            cells = []
+            for td in tr.find_all('td'):
+                a = td.find('a')
+                if a:
+                    cell_content = a.text
+                else:
+                    cell_content = td.text
+                cells.append(cell_content)
+            rows.append(cells)
+        df = pd.DataFrame(rows, columns=header)
+        
+    except:
+        table_code = None
+        df = pd.DataFrame({'TABLE CODE': [table_code]})
     return df
 
 
-if __name__ == '__main__':
-    driver = uc.Chrome(headless=True,use_subprocess=False)
-    url_list = []
-    for page in range(15):
-        driver.get(f'https://data.nasdaq.com/search?page={page + 1}')
-        time.sleep(15)
-        #driver.save_screenshot('nowsecure.png')
-        page_sourse = driver.page_source
-        soup = BeautifulSoup(page_sourse, "html.parser")
-        product_cards = soup.findAll("a", attrs={"class": "product-card__overview-content"})
-        href_list = [card.get('href') for card in product_cards]
-        url_list.extend(href_list)
+def find_code(page):
+    driver = uc.Chrome(headless=False, use_subprocess=False)
+    driver.get(page[0])
+    time.sleep(6)
+    print('Success!' + page[0])
+    page_source_test = driver.page_source
+    soup_test = BeautifulSoup(page_source_test, "html.parser")
+    try:
+            table = soup_test.find("section", attrs={"data-anchor": "anchor-data-organization"}).find("div", attrs={"class": "documentation-markdown"}).find("table")
+    except:
+            table = None
+    df = table_to_df(table)
+    df['urls'] = page[0]
+    driver.quit()
+    return df
+     
 
-    filename = "url_list.csv"
-    with open(filename, mode='w', newline='') as file:
+def get_table_code(url_list):
+    dataframes = []
+    for page in url_list:
+        df = find_code(page)
+        dataframes.append(df)
+    return dataframes
+
+if __name__ == '__main__':
+    with open('url_list.csv', mode='r') as file:
+        reader = csv.reader(file)
+        url_list = [row for row in reader]
+    tc = []
+    dataframes = get_table_code(url_list)
+    for i in dataframes:
+        try: 
+            a = i['TABLE CODE'].values.tolist()
+            tc.append(i['TABLE CODE'].values.tolist())
+        except:
+            try:
+                a = i['Quandl Code'].values.tolist()
+                tc.append(i['TABLE CODE'].values.tolist())
+            except:
+                tc.append([None])
+
+    with open('table_code.csv', 'w', newline='') as file:
         writer = csv.writer(file)
-        for item in url_list:
-            item1 = f'https://data.nasdaq.com' + item
-            writer.writerow([item])
-    print(f"Data has been written to {filename}")
+        writer.writerows(tc)
+    print(f'Data saved to table_code.csv')
