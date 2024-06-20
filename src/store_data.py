@@ -16,7 +16,9 @@ def compress_file(file_path):
             shutil.copyfileobj(f_in, f_out)
     os.remove(file_path)
 
+@task(retries=3)
 def save_to_db(dataframe, table_name):
+    engine = create_engine(DATABASE_URL)
     try:
         table_name = table_name.replace('/', '_').lower()
         dataframe.to_sql(table_name, engine, if_exists='replace', index=False)
@@ -30,11 +32,13 @@ def retrieve_data(query):
         result = pd.read_sql(query, connection)
     return result
 
+@task(retries=3)
 def process_data(key):
     try:
         df = nd.get_table(key).head()
         date_guess = [col for col in df.columns if 'date' in col.lower()][0]
         table, data = download_data(key, paginate = True,  **{date_guess: {'gte': '2024-03-15'}})
+        save_to_db(data, key)
     except:
         table, data = download_data(key, paginate = True)
-    save_to_db(data, key)
+        save_to_db(data, key)
