@@ -10,17 +10,15 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(
 
 
 # TODO: collect download error sets and rerun them.
+@flow(task_runner=MultiprocessTaskRunner(processes=6), log_prints=True)
 def download_all_tables(d):
     start_time = time.time()
-    num_processes = 8
-    print(d.keys(), '+', NASDAQ_API)
-    with ProcessPoolExecutor(max_workers=num_processes) as executor:
-        futures = [executor.submit(process_data, key) for key in d.keys() if d[key]['premium'] == False]
-        for future in concurrent.futures.as_completed(futures):
-            try:
-                future.result()
-            except Exception as e:
-                print(f"Error: {str(e)}")
+    tasks = []
+    for key in d.keys():
+        if not d[key]['premium']:
+            tasks.append(process_data.submit(key))
+    for task in tasks:
+        task.result() 
     end_time = time.time()
     logging.info(f"Total time taken: {end_time - start_time:.2f} seconds")
 
