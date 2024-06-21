@@ -35,8 +35,9 @@ def find_new_rows(existing_data, new_data):
     return new_rows
 
 def insert_new_rows(engine, table_name, new_rows):
-    new_rows.to_sql(table_name, engine, if_exists='append', index=False)
-
+    new_rows.to_sql(table_name, engine, if_exists='append', index=False
+                   
+@task
 def get_latest_data(table_code):
     edt = timezone('US/Eastern')
     current_time_edt = datetime.now(edt)
@@ -54,15 +55,21 @@ def get_latest_data(table_code):
         except:
             try:
                 print('try2')
-                data = nd.get_table(table_code)
-                existing_data = get_existing_data(engine, table_code.replace('/', '_').lower()) # other cases, we simply download the latest 10000 rows of data and insert the new rows by comparing them with the previous data
+                data = nd.get_table(table_code)  # other cases, we simply download the latest 10000 rows of data 
+                existing_data = get_existing_data(engine, table_code.replace('/', '_').lower())
                 data = find_new_rows(existing_data, data)
             except:
                 return None
     print('completed')
     return data
 
+@task(retries = 3)
+def process_data(table_code):
+    data = get_latest_data(table_code)
+    code = table_code.replace('/', '_').lower()
+    existing_data = get_existing_data(engine, code)
+    newdata = find_new_rows(existing_data, data)
+    insert_new_rows(engine, code, newdata) # insert the new rows by comparing them with the previous data
+
 if __name__ == '__main__':
-    data = get_latest_data('NDAQ/RTAT10')
-    print(data)
-    insert_new_rows(engine, 'ndaq_rtat10', data)
+    process_data('NDAQ/RTAT10')
