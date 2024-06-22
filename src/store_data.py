@@ -17,16 +17,23 @@ def compress_file(file_path):
             shutil.copyfileobj(f_in, f_out)
     os.remove(file_path)
 
+
 @task(retries=3)
 def save_to_db(dataframe, table_name):
+    if dataframe is None:
+        logging.error(f"Dataframe is None for table {table_name}.")
+        return
+
     engine = create_engine(DATABASE_URL)
     try:
         table_name = table_name.replace('/', '_').lower()
+        logging.info(f"Saving dataframe to {table_name} table.")
         dataframe.to_sql(table_name, engine, if_exists='replace', index=False)
         logging.info(f"Data saved to {table_name} table successfully.")
     except SQLAlchemyError as e:
         logging.error(f"Error saving data to database: {str(e)}")
-        
+
+
 def retrieve_data(query):
     engine = create_engine(DATABASE_URL)
     with engine.connect() as connection:
