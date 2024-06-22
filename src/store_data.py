@@ -19,7 +19,7 @@ def compress_file(file_path):
 
 
 @task(retries=3)
-def save_to_db(dataframe, table_name):
+def save_to_db(dataframe, table_name, mode='replace'):
     if dataframe is None:
         logging.error(f"Dataframe is None for table {table_name}.")
         return
@@ -27,12 +27,11 @@ def save_to_db(dataframe, table_name):
     engine = create_engine(DATABASE_URL)
     try:
         table_name = table_name.replace('/', '_').lower()
-        logging.info(f"Saving dataframe to {table_name} table.")
-        dataframe.to_sql(table_name, engine, if_exists='replace', index=False)
-        logging.info(f"Data saved to {table_name} table successfully.")
+        logging.info(f"Saving dataframe to {table_name} table with mode {mode}.")
+        dataframe.to_sql(table_name, engine, if_exists=mode, index=False)
+        logging.info(f"Data saved to {table_name} table successfully with mode {mode}.")
     except SQLAlchemyError as e:
         logging.error(f"Error saving data to database: {str(e)}")
-
 
 def retrieve_data(query):
     engine = create_engine(DATABASE_URL)
