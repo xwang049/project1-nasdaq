@@ -1,75 +1,81 @@
+
+import time
+import logging
 import nasdaqdatalink as nd
-from datetime import datetime
-from pytz import timezone
-from prefect import task, flow
-import utils
-import download_data
-import pandas as pd
-import os
-from dotenv import load_dotenv
+from src.config import NASDAQ_API
+from src.sl_dict import load
+from prefect_multiprocess.task_runners import MultiprocessTaskRunner
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 from sqlalchemy import create_engine, text
-from datetime import datetime, timedelta
-from download_data import download_data
-
-load_dotenv()
-
-
-MYSQL_HOST = os.getenv('MYSQL_HOST')
-MYSQL_USER = os.getenv('MYSQL_USER')
-MYSQL_PASSWORD = os.getenv('MYSQL_PASSWORD')
-MYSQL_DB = os.getenv('MYSQL_DB')
-nd.read_key(filename="mykey")
+from config import DATABASE_URL
+from sqlalchemy.engine import Engine
+from prefect import task, flow
+from datetime import datetime
+import logging
+from src.download_data import download_data
+from src.store_data import save_to_db
 
 
-DATABASE_URL = f"mysql+mysqlconnector://{MYSQL_USER}:{MYSQL_PASSWORD}@{MYSQL_HOST}/{MYSQL_DB}"
+def get_db_engine() -> Engine:
+    """ENGINE CONNECTION"""
+    return create_engine(DATABASE_URL)
 
-engine = create_engine(DATABASE_URL)
 
-def get_existing_data(engine, table_name):
-    query = f"SELECT * FROM {table_name}"
-    existing_data = pd.read_sql(query, engine)
-    return existing_data
+def get_date_column(key):
+    nd.ApiConfig.api_key = NASDAQ_API
+    df = nd.get_table(key).head()
+    if 'date' in df.columns:
+        return 'date'
 
-def find_new_rows(existing_data, new_data):
-    new_rows = new_data[~new_data.apply(tuple,1).isin(existing_data.apply(tuple,1))]
-    return new_rows
+    date_guess = [col for col in df.columns if 'date' in col.lower()]
+    if not date_guess:
+        raise ValueError(f"No date-like column found in the table {key}")
+    return date_guess[0]
 
-def insert_new_rows(engine, table_name, new_rows):
-    new_rows.to_sql(table_name, engine, if_exists='append', index=False
-                   
-@task
-def get_latest_data(table_code):
-    edt = timezone('US/Eastern')
-    current_time_edt = datetime.now(edt)
-    previous_day = current_time_edt - timedelta(days=2)
-    date_str = previous_day.strftime('%Y-%m-%d')
-    try:
-        table, data = download_data.submit('NDAQ/RTAT10', paginate = True,  **{'date': {'gte': date_str}}).result() # download directly from column 'date' 
-    except:
-        try:
-            print('try1')
-            df = nd.get_table(table_code).head()
-            date_str = current_time_edt.strftime('%Y-%m-%d')
-            date_guess = [col for col in df.columns if 'date' in col.lower()][0]
-            table, data = download_data.submit(table_code, paginate = True,  **{date_guess: {'gte': date_str}}).result() # In case if 'date' does not exist, we guess a filter that represents datetime
-        except:
-            try:
-                print('try2')
-                data = nd.get_table(table_code)  # other cases, we simply download the latest 10000 rows of data 
-                existing_data = get_existing_data(engine, table_code.replace('/', '_').lower())
-                data = find_new_rows(existing_data, data)
-            except:
-                return None
-    print('completed')
-    return data
+def delete_existing_data(engine: Engine, table_name: str, date_column: str, date: str):
+    """DELETE one day data, run it before update the latest sets"""
+    with engine.connect() as connection:
+        delete_query = text(f"DELETE FROM {table_name} WHERE {date_column} = :date")
+        connection.execute(delete_query, {'date': date})
+        logging.info(f"Deleted old data from {table_name} on {date}.")
+
 
 @task(retries = 3)
-def process_data(table_code):
-    data = get_latest_data(table_code)
-    code = table_code.replace('/', '_').lower()
-    existing_data = get_existing_data(engine, code)
-    newdata = find_new_rows(existing_data, data)
-    insert_new_rows(engine, code, newdata) # insert the new rows by comparing them with the previous data
+def update_data(key):
+    try:
+        now = datetime.utcnow()
+        today = now.strftime('%Y-%m-%d')
+        date_guess = get_date_column(key)
+        table, new_data = download_data(key, paginate=True, **{date_guess: {'2024-06-21'}})
+        if new_data is None or new_data.empty:
+            logging.info(f"No new data for {key} on {today}.")
+            return
 
-if __name__ == '__main__':
-    process_data('NDAQ/RTAT10')
+        engine = get_db_engine()
+        table_name = key.replace('/', '_').lower()
+        with engine.connect() as connection:
+            delete_query = text(f"DELETE FROM {table_name} WHERE {date_guess} = :date")
+            connection.execute(delete_query, {'date': '2024-06-21'})
+            logging.info(f"Deleted old data for {key} on {'2024-06-21'}.")
+
+        save_to_db(new_data, key, 'append')
+    except Exception as e:
+        logging.error(f"Error updating data for {key}: {e}")
+
+
+
+@flow(task_runner=MultiprocessTaskRunner(processes=6), log_prints=True)
+def update_all_tables(d):
+    start_time = time.time()
+    tasks = []
+    for key in d.keys():
+        if not d[key]['premium']:
+            tasks.append(update_data.submit(key))
+    for task in tasks:
+        task.result()
+    end_time = time.time()
+    logging.info(f"Total time taken: {end_time - start_time:.2f} seconds")
+
+if __name__ == "__main__":
+    d = load('../data/info_dict.pkl')
+    update_all_tables(d)
