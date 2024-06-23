@@ -4,7 +4,7 @@ from datetime import datetime
 import time
 from pytz import timezone
 from prefect import task, flow, serve
-import db
+from store_data import retrieve_data
 import pandas as pd
 import os
 from dotenv import load_dotenv
@@ -59,7 +59,7 @@ def get_latest_data(table_code):
     date_str = previous_day.strftime('%Y-%m-%d')
     try:
         print('try0')
-        table, data = ne.get_table('NDAQ/RTAT10', paginate = True,  **{'date': {'gte': date_str}}) # download directly from column 'date' 
+        table, data = nd.get_table(table_code, paginate = True,  **{'date': {'gte': date_str}}) # download directly from column 'date' 
     except:
         try:
             print('try1')
@@ -89,7 +89,7 @@ def process_data(table_code):
     data = find_new_rows(existing_data, data)
     print('findnewdata')
     insert_new_rows(code, data)
-    print('complete')
+    print('completed')
 
 @flow(log_prints=True)
 def update_data(key: str = ''):
@@ -99,7 +99,7 @@ def update_data(key: str = ''):
 def update_all_data(d = sl_dict.load('info_dict.pkl')):
     start_time = time.time()
     tasks = []
-    temp = db.retrieve_data("SELECT table_name FROM information_schema.tables WHERE table_schema = DATABASE()").values.tolist()
+    temp = retrieve_data("SELECT table_name FROM information_schema.tables WHERE table_schema = DATABASE()").values.tolist()
     all_tables = [row[0].replace('_', '/').upper() for row in temp]
     for key in all_tables:
         if not d[key]['premium']:
@@ -111,7 +111,7 @@ def update_all_data(d = sl_dict.load('info_dict.pkl')):
     
 if __name__ == '__main__':
     d = sl_dict.load('info_dict.pkl')
-    temp = db.retrieve_data("SELECT table_name FROM information_schema.tables WHERE table_schema = DATABASE()").values.tolist()
+    temp = retrieve_data("SELECT table_name FROM information_schema.tables WHERE table_schema = DATABASE()").values.tolist()
     all_tables = [row[0].replace('_', '/').upper() for row in temp]
     tasks = []
     for key in all_tables:
