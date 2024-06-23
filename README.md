@@ -7,7 +7,7 @@
 - mysql-connector-python
 - nasdaq-data-link
 - python-dotenv
-
+  - And check more in requirements.txt file.
 ## Setup
 
 1. Install the requirements:

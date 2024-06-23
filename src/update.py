@@ -15,17 +15,16 @@ import logging
 
 load_dotenv()
 
-
 MYSQL_HOST = os.getenv('MYSQL_HOST')
 MYSQL_USER = os.getenv('MYSQL_USER')
 MYSQL_PASSWORD = os.getenv('MYSQL_PASSWORD')
 MYSQL_DB = os.getenv('MYSQL_DB')
 nd.read_key(filename="mykey")
 
-
 DATABASE_URL = f"mysql+mysqlconnector://{MYSQL_USER}:{MYSQL_PASSWORD}@{MYSQL_HOST}/{MYSQL_DB}"
 
 engine = create_engine(DATABASE_URL)
+
 
 def get_existing_data(table_name):
     engine = create_engine(DATABASE_URL)
@@ -39,7 +38,7 @@ def find_new_rows(existing_data, new_data):
         return None
     if existing_data is None:
         return new_data
-    new_rows = new_data[~new_data.apply(tuple,1).isin(existing_data.apply(tuple,1))]
+    new_rows = new_data[~new_data.apply(tuple, 1).isin(existing_data.apply(tuple, 1))]
     return new_rows
 
 
@@ -50,7 +49,8 @@ def insert_new_rows(table_name, new_rows):
     if new_rows.empty:
         return
     new_rows.to_sql(table_name, engine, if_exists='append', index=False)
-                   
+
+
 @task
 def get_latest_data(table_code):
     edt = timezone('US/Eastern')
@@ -59,14 +59,16 @@ def get_latest_data(table_code):
     date_str = previous_day.strftime('%Y-%m-%d')
     try:
         print('try0')
-        table, data = nd.get_table(table_code, paginate = True,  **{'date': {'gte': date_str}}) # download directly from column 'date' 
+        table, data = nd.get_table(table_code, paginate=True,
+                                   **{'date': {'gte': date_str}})  # download directly from column 'date'
     except:
         try:
             print('try1')
             df = nd.get_table(table_code).head()
             date_str = current_time_edt.strftime('%Y-%m-%d')
             date_guess = [col for col in df.columns if 'date' in col.lower()][0]
-            table, data = nd.get_table(table_code, paginate = True,  **{date_guess: {'gte': date_str}}) # In case if 'date' does not exist, we guess a filter that represents datetime
+            table, data = nd.get_table(table_code, paginate=True, **{date_guess: {
+                'gte': date_str}})  # In case if 'date' does not exist, we guess a filter that represents datetime
         except:
             try:
                 print('try2')
@@ -78,7 +80,8 @@ def get_latest_data(table_code):
     print('completed')
     return data
 
-@task(retries = 2)
+
+@task(retries=2)
 def process_data(table_code):
     print(table_code)
     data = get_latest_data(table_code)
@@ -91,35 +94,42 @@ def process_data(table_code):
     insert_new_rows(code, data)
     print('completed')
 
+
 @flow(log_prints=True)
 def update_data(key: str = ''):
     process_data(key)
 
+
 @flow(task_runner=MultiprocessTaskRunner(processes=8), log_prints=True)
-def update_all_data(d = sl_dict.load('info_dict.pkl')):
+def update_all_data(d):
     start_time = time.time()
     tasks = []
-    temp = retrieve_data("SELECT table_name FROM information_schema.tables WHERE table_schema = DATABASE()").values.tolist()
+    temp = retrieve_data(
+        "SELECT table_name FROM information_schema.tables WHERE table_schema = DATABASE()").values.tolist()
     all_tables = [row[0].replace('_', '/').upper() for row in temp]
     for key in all_tables:
         if not d[key]['premium']:
             tasks.append(process_data.submit(key))
     for task in tasks:
-        task.result() 
+        task.result()
     end_time = time.time()
     logging.info(f"Total time taken: {end_time - start_time:.2f} seconds")
-    
+
+
 if __name__ == '__main__':
-    d = sl_dict.load('info_dict.pkl')
-    temp = retrieve_data("SELECT table_name FROM information_schema.tables WHERE table_schema = DATABASE()").values.tolist()
+    d = sl_dict.load('../data/info_dict.pkl')
+    temp = retrieve_data(
+        "SELECT table_name FROM information_schema.tables WHERE table_schema = DATABASE()").values.tolist()
     all_tables = [row[0].replace('_', '/').upper() for row in temp]
     tasks = []
     for key in all_tables:
         cron = d[key]['status']['expected_at']
         if cron is None:
-            cron = '00 00 * * *'         # If it is not clear when to update, we set the update time as 12:00AM everyday
+            cron = '00 00 * * *'  # If it is not clear when to update, we set the update time as 12:00AM everyday
         try:
-            tasks.append(update_data.to_deployment(name=f"updating {key.replace('/', '_').lower()}",cron = cron, parameters = {'key' : key}))
+            tasks.append(update_data.to_deployment(name=f"updating {key.replace('/', '_').lower()}", cron=cron,
+                                                   parameters={'key': key}))
         except:
-            tasks.append(update_data.to_deployment(name=f"updating {key.replace('/', '_').lower()}",cron = '00 00 * * *', parameters = {'key' : key}))
+            tasks.append(update_data.to_deployment(name=f"updating {key.replace('/', '_').lower()}", cron='00 00 * * *',
+                                                   parameters={'key': key}))
     serve(*tasks)
