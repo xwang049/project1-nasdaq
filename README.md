@@ -32,7 +32,28 @@
 To download and store data, use the following command:
 ```bash
 python -m src.utils
+```
 
+To set all local tables to update automatically, please run:
 
+```sh
+python -m src.update.py
+```
 
+To get the list of all URLs of data tables, use the following command:
 
+```sh
+python -m src.get_url
+```
+
+To get the .csv file containing all table_codes, use the following command:
+
+```sh
+python -m src.websc
+```
+
+To generate the info dictionary of all data_tables, use the following command:
+
+```sh
+python -m src.info_dictionary
+```
