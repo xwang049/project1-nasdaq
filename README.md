@@ -40,13 +40,13 @@ To set all local tables to update automatically, please run:
 python -m src.update.py
 ```
 
-To get the list of all URLs of data tables, use the following command:
+To get the list of all URLs of data tables, use the following command (Please refer to notebooks/Notebook1.ipynb for running details):
 
 ```sh
 python -m src.get_url
 ```
 
-To get the .csv file containing all table_codes, use the following command:
+To get the .csv file containing all table_codes, use the following command (Please refer to notebooks/Notebook1.ipynb for running details):
 
 ```sh
 python -m src.websc
