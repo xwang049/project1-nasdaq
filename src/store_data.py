@@ -10,6 +10,7 @@ from .config import DATABASE_URL
 import logging
 from .download_data import download_data
 from prefect import task, flow
+from io import BytesIO
 engine = create_engine(DATABASE_URL)
 
 def compress_file(file_path):
