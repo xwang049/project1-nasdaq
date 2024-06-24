@@ -109,17 +109,20 @@ def update_all_data(d = sl_dict.load('info_dict.pkl')):
     end_time = time.time()
     logging.info(f"Total time taken: {end_time - start_time:.2f} seconds")
     
+
 if __name__ == '__main__':
     d = sl_dict.load('info_dict.pkl')
-    temp = retrieve_data("SELECT table_name FROM information_schema.tables WHERE table_schema = DATABASE()").values.tolist()
+    temp = db.retrieve_data("SELECT table_name FROM information_schema.tables WHERE table_schema = DATABASE()").values.tolist()
     all_tables = [row[0].replace('_', '/').upper() for row in temp]
     tasks = []
     for key in all_tables:
         cron = d[key]['status']['expected_at']
         if cron is None:
-            cron = '00 00 * * *'         # If it is not clear when to update, we set the update time as 12:00AM everyday
+            cron = '00 00 * * *'
         try:
-            tasks.append(update_data.to_deployment(name=f"updating {key.replace('/', '_').lower()}",cron = cron, parameters = {'key' : key}))
+            schedule = CronSchedule(cron = cron, timezone = 'America/New_York')
+            tasks.append(update_data.to_deployment(name=f"updating {key.replace('/', '_').lower()}",work_pool_name="proj1", schedule = schedule, parameters = {'key' : key}))
         except:
-            tasks.append(update_data.to_deployment(name=f"updating {key.replace('/', '_').lower()}",cron = '00 00 * * *', parameters = {'key' : key}))
+            schedule = CronSchedule(cron = '00 00 * * *', timezone = 'America/New_York')
+            tasks.append(update_data.to_deployment(name=f"updating {key.replace('/', '_').lower()}",work_pool_name="proj1", schedule = schedule, parameters = {'key' : key}))
     serve(*tasks)
