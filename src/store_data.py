@@ -3,13 +3,14 @@ import os
 import shutil
 import nasdaqdatalink as nd
 import pandas as pd
+import pickle
 import sqlalchemy as sa
 from sqlalchemy import create_engine
 from sqlalchemy.exc import SQLAlchemyError
 from .config import DATABASE_URL
 import logging
 from .download_data import download_data
-from prefect import task, flow
+from prefect import task
 from io import BytesIO
 engine = create_engine(DATABASE_URL)
 
@@ -49,7 +50,7 @@ def process_data(key):
 def store_compressed_data_to_db(file_path, table_name):
     engine = create_engine(DATABASE_URL)
     with engine.connect() as conn:
-        conn.execute(text(f"""
+        conn.execute(sa.text(f"""
             CREATE TABLE IF NOT EXISTS {table_name} (
                 id INT AUTO_INCREMENT PRIMARY KEY,
                 data MEDIUMBLOB
