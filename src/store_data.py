@@ -3,6 +3,7 @@ import os
 import shutil
 import nasdaqdatalink as nd
 import pandas as pd
+import sqlalchemy as sa
 from sqlalchemy import create_engine
 from sqlalchemy.exc import SQLAlchemyError
 from .config import DATABASE_URL
