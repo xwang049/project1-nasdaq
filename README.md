@@ -37,7 +37,7 @@ python -m src.utils
 To set all local tables to update automatically, please run:
 
 ```sh
-python -m src.update.py
+python -m src.update
 ```
 
 To get the list of all URLs of data tables, use the following command (Please refer to notebooks/Notebook1.ipynb for running details):
